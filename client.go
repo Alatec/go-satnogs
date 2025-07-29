@@ -54,9 +54,8 @@ func (c *Client) Get(endpoint string, params []urlParam) (*http.Response, error)
 
 	// Add authorization header if API key is set
 	if c.apiKey != "" {
-		req.Header.Set("Authorization", c.apiKey)
+		req.Header.Set("Authorization", "Token "+c.apiKey)
 	}
-
 	return c.client.Do(req)
 }
 
@@ -81,7 +80,7 @@ type TelemetryResponse struct {
 }
 
 func (c *Client) GetTelemetry(satelliteID string) ([]Telemetry, error) {
-	resp, err := c.Get("/telemetry/", []urlParam{{"sat_id", satelliteID}})
+	resp, err := c.Get("/telemetry/", []urlParam{{"sat_id", satelliteID}, {"format", "json"}})
 	if err != nil {
 		return nil, err
 	}

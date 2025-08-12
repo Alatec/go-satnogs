@@ -79,41 +79,90 @@ type TelemetryResponse struct {
 	Results []Telemetry `json:"results"`
 }
 
+// GetTelemetry retrieves telemetry data for a specific satellite from the SatNOGS database.
+// It returns a slice of Telemetry structs containing the decoded data, or an error if the request fails.
+//
+// Parameters:
+//   - satelliteID: The unique identifier of the satellite (typically a NORAD ID as a string)
+//
+// Returns:
+//   - []Telemetry: A slice of Telemetry structs containing the satellite's telemetry data
+//   - error: An error object if the request fails or if the response cannot be decoded
+//
+// Note: This function only returns the first page of results. For complete telemetry data,
+// consider using GetTelemetryResponse() which has pagination support.
 func (c *Client) GetTelemetry(satelliteID string) ([]Telemetry, error) {
-	resp, err := c.Get("/telemetry/", []urlParam{{"sat_id", satelliteID}, {"format", "json"}})
+	resp, err := c.GetTelemetryResponse(satelliteID)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	var telemetryResponse TelemetryResponse
-	if err := json.NewDecoder(resp.Body).Decode(&telemetryResponse); err != nil {
-		return nil, err
-	}
-	return telemetryResponse.Results, nil
+	return resp.Results, nil
 }
 
-func (c *Client) GetAllTelemetryForSatellite(satelliteID string) ([]Telemetry, error) {
+func (c *Client) GetTelemetryResponse(satelliteID string) (*TelemetryResponse, error) {
 	resp, err := c.Get("/telemetry/", []urlParam{{"sat_id", satelliteID}, {"format", "json"}})
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	var telemetryResponse TelemetryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&telemetryResponse); err != nil {
 		return nil, err
 	}
-	for telemetryResponse.Next != "" {
-		resp, err := c.Get(telemetryResponse.Next, nil)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-		var nextTelemetryResponse TelemetryResponse
-		if err := json.NewDecoder(resp.Body).Decode(&nextTelemetryResponse); err != nil {
-			return nil, err
-		}
-		telemetryResponse.Results = append(telemetryResponse.Results, nextTelemetryResponse.Results...)
+	return &telemetryResponse, nil
+}
+
+func (c *Client) GetTelemetryResponseNextPage(t *TelemetryResponse) (*TelemetryResponse, error) {
+	if t.Next == "" {
+		return nil, nil
 	}
-	return telemetryResponse.Results, nil
+	// Create request
+	req, err := http.NewRequest("GET", t.Next, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add authorization header if API key is set
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Token "+c.apiKey)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var telemetryResponse TelemetryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&telemetryResponse); err != nil {
+		return nil, err
+	}
+	return &telemetryResponse, nil
+}
+
+func (c *Client) GetTelemetryResponsePrevPage(t *TelemetryResponse) (*TelemetryResponse, error) {
+	if t.Prev == "" {
+		return nil, nil
+	}
+	// Create request
+	req, err := http.NewRequest("GET", t.Prev, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add authorization header if API key is set
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Token "+c.apiKey)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var telemetryResponse TelemetryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&telemetryResponse); err != nil {
+		return nil, err
+	}
+	return &telemetryResponse, nil
 }

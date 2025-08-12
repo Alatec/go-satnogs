@@ -92,3 +92,28 @@ func (c *Client) GetTelemetry(satelliteID string) ([]Telemetry, error) {
 	}
 	return telemetryResponse.Results, nil
 }
+
+func (c *Client) GetAllTelemetryForSatellite(satelliteID string) ([]Telemetry, error) {
+	resp, err := c.Get("/telemetry/", []urlParam{{"sat_id", satelliteID}, {"format", "json"}})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var telemetryResponse TelemetryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&telemetryResponse); err != nil {
+		return nil, err
+	}
+	for telemetryResponse.Next != "" {
+		resp, err := c.Get(telemetryResponse.Next, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		var nextTelemetryResponse TelemetryResponse
+		if err := json.NewDecoder(resp.Body).Decode(&nextTelemetryResponse); err != nil {
+			return nil, err
+		}
+		telemetryResponse.Results = append(telemetryResponse.Results, nextTelemetryResponse.Results...)
+	}
+	return telemetryResponse.Results, nil
+}
